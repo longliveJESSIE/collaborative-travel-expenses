@@ -22,6 +22,7 @@ export default function ExpenseDetailPage() {
   const [saving, setSaving] = useState(false);
   const [myUserId, setMyUserId] = useState("");
 
+  const [editPayerId, setEditPayerId] = useState("");
   const [editSplitType, setEditSplitType] = useState<SplitType>("equal");
   const [editDescription, setEditDescription] = useState("");
   const [editAmount, setEditAmount] = useState(0);
@@ -31,7 +32,7 @@ export default function ExpenseDetailPage() {
   const [editCustomAmounts, setEditCustomAmounts] = useState<Record<string, number>>({});
   const [editPercentages, setEditPercentages] = useState<Record<string, number>>({});
 
-  const canEdit = expense && trip && (expense.creator_id === myUserId || trip.creator_id === myUserId);
+  const canEdit = expense && trip && allMembers.some((m) => m.profile_id === myUserId);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => { if (user) setMyUserId(user.id); });
@@ -70,6 +71,7 @@ export default function ExpenseDetailPage() {
     setEditAmount(e.amount);
     setEditCategory(e.category);
     setEditDate(e.expense_date);
+    setEditPayerId(e.payer_id || "");
     setEditSplitType((e.split_type as SplitType) || "equal");
     setSelectedPids(pidSet);
     setEditCustomAmounts(customMap);
@@ -152,11 +154,10 @@ export default function ExpenseDetailPage() {
         }
       }
 
-      console.log("Saving:", { editSplitType, newBase, finalAmountsBase, selList });
-
       const { error: updErr } = await supabase.from("expenses").update({
         description: editDescription, amount: editAmount, base_amount: newBase,
         category: editCategory, expense_date: editDate,
+        payer_id: expense.type === "shared" ? editPayerId : null,
         split_type: expense.type === "shared" ? editSplitType : null,
         updated_at: new Date().toISOString(),
       }).eq("id", expenseId);
@@ -212,6 +213,13 @@ export default function ExpenseDetailPage() {
 
             {expense.type === "shared" && (
               <div className="bg-white rounded-2xl p-4 space-y-3">
+                <div>
+                  <label className="text-xs text-gray-400">付款人</label>
+                  <select value={editPayerId} onChange={(e) => setEditPayerId(e.target.value)}
+                    className="w-full h-11 mt-1 bg-gray-50 rounded-xl px-3 text-sm focus:outline-none">
+                    {allMembers.map((m) => (<option key={m.profile_id} value={m.profile_id}>{m.nickname}</option>))}
+                  </select>
+                </div>
                 <label className="text-xs text-gray-400">分账方式</label>
                 <div className="flex gap-2">
                   {(["equal", "custom", "percentage"] as const).map((s) => (
